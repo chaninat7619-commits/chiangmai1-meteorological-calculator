@@ -1,0 +1,380 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>เครื่องคำนวณสมการทางอุตุนิยมวิทยา</title>
+<style>
+:root {
+  color-scheme: light dark;
+  --bg: light-dark(#f4f7fb, #0f172a);
+  --surface: light-dark(#ffffff, #172033);
+  --surface-2: light-dark(#eef3f9, #202b40);
+  --text: light-dark(#172033, #f5f7fb);
+  --muted: light-dark(#5f6b7a, #aab5c7);
+  --border: light-dark(#d9e0e8, #334155);
+  --accent: light-dark(#123b68, #7db6ee);
+  --accent-text: light-dark(#ffffff, #07111f);
+  --success: light-dark(#166534, #86efac);
+  --error: light-dark(#b42318, #fca5a5);
+}
+* { box-sizing: border-box; }
+body { margin: 0; font-family: "Noto Sans Thai", "Leelawadee UI", Tahoma, sans-serif; background: var(--bg); color: var(--text); }
+#app { min-height: 100vh; background: var(--bg); }
+.container { width: min(920px, calc(100% - 32px)); margin: 0 auto; padding: 34px 0 48px; }
+.header { margin-bottom: 24px; }
+.kicker { font-size: 13px; font-weight: 700; letter-spacing: .06em; color: var(--accent); text-transform: uppercase; }
+h1 { margin: 7px 0 8px; font-size: clamp(26px, 4vw, 38px); line-height: 1.2; }
+.subtitle { margin: 0; color: var(--muted); line-height: 1.7; }
+.panel { background: var(--surface); border: 1px solid var(--border); border-radius: 18px; padding: 22px; margin-top: 16px; }
+.panel h2 { margin: 0 0 16px; font-size: 19px; }
+.grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 15px; }
+.field { min-width: 0; }
+label { display: block; font-size: 14px; font-weight: 700; margin-bottom: 7px; }
+input, select { width: 100%; min-height: 46px; border: 1px solid var(--border); border-radius: 10px; padding: 10px 12px; font: inherit; color: var(--text); background: var(--surface); outline: none; }
+input:focus, select:focus { border-color: var(--accent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 18%, transparent); }
+.help { margin-top: 6px; color: var(--muted); font-size: 12px; }
+.actions { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 20px; }
+button { min-height: 46px; border-radius: 10px; padding: 10px 18px; border: 1px solid var(--border); background: var(--surface); color: var(--text); font: inherit; font-weight: 700; cursor: pointer; }
+button.primary { background: var(--accent); color: var(--accent-text); border-color: var(--accent); }
+button:hover { filter: brightness(.97); }
+button:focus-visible { outline: 3px solid color-mix(in srgb, var(--accent) 35%, transparent); outline-offset: 2px; }
+.result { background: var(--surface-2); border-radius: 14px; padding: 18px; margin-top: 20px; }
+.result-label { color: var(--muted); font-size: 13px; }
+.result-value { font-size: clamp(28px, 5vw, 42px); font-weight: 800; margin: 4px 0; overflow-wrap: anywhere; }
+.result-unit { color: var(--muted); font-size: 14px; }
+.message { min-height: 20px; margin-top: 12px; font-size: 14px; }
+.message.error { color: var(--error); }
+.message.success { color: var(--success); }
+.equation { margin-top: 14px; padding: 13px 15px; border-left: 4px solid var(--accent); background: var(--surface-2); border-radius: 8px; font-family: Georgia, "Times New Roman", serif; line-height: 1.8; overflow-x: auto; }
+.note { margin: 0; color: var(--muted); font-size: 13px; line-height: 1.7; }
+.footer-note { margin-top: 18px; text-align: center; color: var(--muted); font-size: 12px; }
+.hidden { display: none !important; }
+@media (max-width: 640px) { .container { width: min(100% - 22px, 920px); padding-top: 24px; } .panel { padding: 17px; border-radius: 14px; } .grid { grid-template-columns: 1fr; } }
+</style>
+</head>
+<body>
+<main id="app">
+  <div class="container">
+    <header class="header">
+      <div class="kicker">Chiang Mai Meteorological Model</div>
+      <h1>เครื่องคำนวณสมการทางอุตุนิยมวิทยา</h1>
+      <p class="subtitle">คำนวณความสูงชั้นผสมอากาศ (Mixing Height) และอัตราการระบายอากาศ (Ventilation Rate) จากตัวแบบข้อมูลรวมและตัวแบบรายเดือน</p>
+    </header>
+
+    <section class="panel" aria-labelledby="model-title">
+      <h2 id="model-title">1. เลือกตัวแบบ</h2>
+      <div class="grid">
+        <div class="field">
+          <label for="modelType">ประเภทตัวแบบ</label>
+          <select id="modelType">
+            <option value="combined">ข้อมูลรวม</option>
+            <option value="monthly">รายเดือน</option>
+          </select>
+        </div>
+        <div class="field hidden" id="monthField">
+          <label for="month">เดือน</label>
+          <select id="month">
+            <option value="january">มกราคม</option>
+            <option value="february">กุมภาพันธ์</option>
+            <option value="march">มีนาคม</option>
+            <option value="april">เมษายน</option>
+            <option value="may">พฤษภาคม</option>
+          </select>
+        </div>
+        <div class="field">
+          <label for="target">ตัวแปรตามที่ต้องการคำนวณ</label>
+          <select id="target">
+            <option value="y1">ความสูงชั้นผสมอากาศ (Y₁)</option>
+            <option value="y2">อัตราการระบายอากาศ (Y₂)</option>
+          </select>
+        </div>
+      </div>
+    </section>
+
+    <section class="panel" aria-labelledby="input-title">
+      <h2 id="input-title">2. กรอกค่าตัวแปร</h2>
+      <div id="inputs" class="grid"></div>
+      <div id="equation" class="equation" aria-live="polite"></div>
+      <div class="actions">
+        <button type="button" class="primary" id="calculate">คำนวณ</button>
+        <button type="button" id="reset">ล้างค่า</button>
+      </div>
+      <div id="message" class="message" aria-live="polite"></div>
+
+      <div class="result" aria-live="polite">
+        <div class="result-label">ผลการคำนวณ</div>
+        <div id="resultValue" class="result-value">—</div>
+        <div id="resultUnit" class="result-unit">กรอกข้อมูลแล้วกด “คำนวณ”</div>
+      </div>
+    </section>
+
+    <section class="panel">
+      <h2>หมายเหตุ</h2>
+    <p class="note">เว็บไซต์เวอร์ชันนี้มีสมการ 12 สมการ ได้แก่ ตัวแบบข้อมูลรวม 2 สมการ และตัวแบบรายเดือนของเดือนมกราคม กุมภาพันธ์ มีนาคม เมษายน และพฤษภาคม 10 สมการ</p>
+    </section>
+    <div class="footer-note">ต้นแบบเครื่องคำนวณสำหรับงานวิจัยด้านอุตุนิยมวิทยา</div>
+  </div>
+</main>
+
+<script>
+(function () {
+  "use strict";
+
+  const models = {
+    combined: {
+      label: "ข้อมูลรวม",
+      y1: {
+        name: "ความสูงชั้นผสมอากาศ",
+        unit: "เมตร (m)",
+        variables: ["x2", "x3", "x4", "x5"],
+        equation: "y₁ = 9363.983 − 246.562x₂ − 13.485x₂² − 89.243x₃ + 16.852x₄ − 55.936x₅ − 7.069x₅² + 23.144(x₂×x₅) + 1.907(x₃×x₅)",
+        calc: function (x) {
+          return 9363.983 - 246.562*x.x2 - 13.485*Math.pow(x.x2,2) - 89.243*x.x3 + 16.852*x.x4 - 55.936*x.x5 - 7.069*Math.pow(x.x5,2) + 23.144*(x.x2*x.x5) + 1.907*(x.x3*x.x5);
+        }
+      },
+      y2: {
+        name: "อัตราการระบายอากาศ",
+        unit: "ตารางเมตรต่อวินาที (m²/s)",
+        variables: ["x2", "x3", "x4", "x5", "x6"],
+        equation: "y₂ = 14844.716 − 227.534x₂ − 16.675x₂² − 100.650x₃ + 214.593x₄ − 700.222x₆ + 21.317(x₂×x₅)",
+        calc: function (x) {
+          return 14844.716 - 227.534*x.x2 - 16.675*Math.pow(x.x2,2) - 100.650*x.x3 + 214.593*x.x4 - 700.222*x.x6 + 21.317*(x.x2*x.x5);
+        }
+      }
+    },
+    january: {
+      label: "มกราคม",
+      y1: {
+        name: "ความสูงชั้นผสมอากาศ",
+        unit: "เมตร (m)",
+        variables: ["x2", "x3", "x5", "x6"],
+        equation: "y₁ = 28177.312 − 1275.334x₂ + 17.224x₂² − 317.601x₃ − 79.498x₅ − 18.671x₅² − 395.907x₆ + 22.091(x₂×x₅) + 10.065(x₃×x₅)",
+        calc: function (x) {
+          return 28177.312 - 1275.334*x.x2 + 17.224*Math.pow(x.x2,2) - 317.601*x.x3 - 79.498*x.x5 - 18.671*Math.pow(x.x5,2) - 395.907*x.x6 + 22.091*(x.x2*x.x5) + 10.065*(x.x3*x.x5);
+        }
+      },
+      y2: {
+        name: "อัตราการระบายอากาศ",
+        unit: "ตารางเมตรต่อวินาที (m²/s)",
+        variables: ["x4", "x5"],
+        equation: "y₂ = 2061.67 + 243.94x₄ − 295.66x₅ + 16.46x₅²",
+        calc: function (x) {
+          return 2061.67 + 243.94*x.x4 - 295.66*x.x5 + 16.46*Math.pow(x.x5,2);
+        }
+      }
+    },
+    february: {
+      label: "กุมภาพันธ์",
+      y1: {
+        name: "ความสูงชั้นผสมอากาศ",
+        unit: "เมตร (m)",
+        variables: ["x1", "x2", "x3", "x4", "x6"],
+        equation: "y₁ = 7.369×10⁶ − 1.448×10⁴x₁ + 7.112×10³x₁² − 1.286×10²x₂ − 6.809x₂² + 1.106×10²x₃ − 1.349x₃² + 4.654×10¹x₄ − 1.454×10²x₆ + 5.289(x₂×x₃)",
+        calc: function (x) {
+          return 7.369e6 - 1.448e4*x.x1 + 7.112e3*Math.pow(x.x1,2) - 1.286e2*x.x2 - 6.809*Math.pow(x.x2,2) + 1.106e2*x.x3 - 1.349*Math.pow(x.x3,2) + 4.654e1*x.x4 - 1.454e2*x.x6 + 5.289*(x.x2*x.x3);
+        }
+      },
+      y2: {
+        name: "อัตราการระบายอากาศ",
+        unit: "ตารางเมตรต่อวินาที (m²/s)",
+        variables: ["x1", "x2", "x3"],
+        equation: "y₂ = −1.118×10⁷ + 2.237×10⁴x₁ − 1.119×10¹x₁² + 1.596×10²x₃ − 2.220x₃² + 6.293(x₂×x₃)",
+        calc: function (x) {
+          return -1.118e7 + 2.237e4*x.x1 - 1.119e1*Math.pow(x.x1,2) + 1.596e2*x.x3 - 2.220*Math.pow(x.x3,2) + 6.293*(x.x2*x.x3);
+        }
+      }
+    },
+    march: {
+      label: "มีนาคม",
+      y1: {
+        name: "ความสูงชั้นผสมอากาศ",
+        unit: "เมตร (m)",
+        variables: ["x3"],
+        equation: "y₁ = −1588.460 + 160.097x₃ − 1.291x₃²",
+        calc: function (x) {
+          return -1588.460 + 160.097*x.x3 - 1.291*Math.pow(x.x3,2);
+        }
+      },
+      y2: {
+        name: "อัตราการระบายอากาศ",
+        unit: "ตารางเมตรต่อวินาที (m²/s)",
+        variables: ["x4", "x5"],
+        equation: "y₂ = −205343.04 + 313.69x₄ + 11337.24x₅ − 147.53x₅²",
+        calc: function (x) {
+          return -205343.04 + 313.69*x.x4 + 11337.24*x.x5 - 147.53*Math.pow(x.x5,2);
+        }
+      }
+    },
+    april: {
+      label: "เมษายน",
+      y1: {
+        name: "ความสูงชั้นผสมอากาศ",
+        unit: "เมตร (m)",
+        variables: ["x2", "x3", "x5"],
+        equation: "y₁ = 3540.998 − 652.034x₂ − 10.063x₃ + 361.526x₅ − 8.913x₅² + 16.700(x₂×x₅)",
+        calc: function (x) {
+          return 3540.998 - 652.034*x.x2 - 10.063*x.x3 + 361.526*x.x5 - 8.913*Math.pow(x.x5,2) + 16.700*(x.x2*x.x5);
+        }
+      },
+      y2: {
+        name: "อัตราการระบายอากาศ",
+        unit: "ตารางเมตรต่อวินาที (m²/s)",
+        variables: ["x1", "x2", "x5"],
+        equation: "y₂ = −340749.05 + 391.07x₁ − 3582.27x₂ + 233.52x₂² − 1090.98x₅ + 95.40x₅² − 206.16(x₂×x₅)",
+        calc: function (x) {
+          return -340749.05 + 391.07*x.x1 - 3582.27*x.x2 + 233.52*Math.pow(x.x2,2) - 1090.98*x.x5 + 95.40*Math.pow(x.x5,2) - 206.16*(x.x2*x.x5);
+        }
+      }
+    },
+    may: {
+      label: "พฤษภาคม",
+      y1: {
+        name: "ความสูงชั้นผสมอากาศ",
+        unit: "เมตร (m)",
+        variables: ["x2", "x3", "x4", "x5", "x6"],
+        equation: "y₁ = −619.883 − 105.805x₂ − 24.010x₃ + 32.586x₄ + 217.324x₅ − 267.289x₆",
+        calc: function (x) {
+          return -619.883 - 105.805*x.x2 - 24.010*x.x3 + 32.586*x.x4 + 217.324*x.x5 - 267.289*x.x6;
+        }
+      },
+      y2: {
+        name: "อัตราการระบายอากาศ",
+        unit: "ตารางเมตรต่อวินาที (m²/s)",
+        variables: ["x1", "x2", "x4", "x5"],
+        equation: "y₂ = 9.261×10⁶ − 1.787×10⁴x₁ + 8.615x₁² − 7.842×10²x₂ + 2.395×10²x₄ + 8.367×10²x₅",
+        calc: function (x) {
+          return 9.261e6 - 1.787e4*x.x1 + 8.615*Math.pow(x.x1,2) - 7.842e2*x.x2 + 2.395e2*x.x4 + 8.367e2*x.x5;
+        }
+      }
+    }
+  };
+
+  const variableInfo = {
+    x1: { label: "ความกดอากาศ", unit: "hPa", placeholder: "เช่น 1012" },
+    x2: { label: "อุณหภูมิช่วง 07.00 น.", unit: "°C", placeholder: "เช่น 22" },
+    x3: { label: "อุณหภูมิจุดน้ำค้าง", unit: "°C", placeholder: "เช่น 17" },
+    x4: { label: "จำนวนของเมฆ", unit: "", placeholder: "เช่น 4" },
+    x5: { label: "อุณหภูมิสูงสุดรายวัน", unit: "°C", placeholder: "เช่น 30" },
+    x6: { label: "ความเร็วลม 07.00 น.", unit: "m/s", placeholder: "เช่น 1.5" }
+  };
+
+  const modelType = document.getElementById("modelType");
+  const monthField = document.getElementById("monthField");
+  const month = document.getElementById("month");
+  const target = document.getElementById("target");
+  const inputs = document.getElementById("inputs");
+  const equation = document.getElementById("equation");
+  const calculate = document.getElementById("calculate");
+  const reset = document.getElementById("reset");
+  const message = document.getElementById("message");
+  const resultValue = document.getElementById("resultValue");
+  const resultUnit = document.getElementById("resultUnit");
+
+  ["january", "february", "march", "april", "may"].forEach(function (key) {
+    if (!month.querySelector('option[value="' + key + '"]')) {
+      const option = document.createElement("option");
+      option.value = key;
+      option.textContent = models[key].label;
+      month.appendChild(option);
+    }
+  });
+
+  function activeModel() {
+    return modelType.value === "combined" ? models.combined : models[month.value];
+  }
+
+  function activeTarget() {
+    return activeModel()[target.value];
+  }
+
+  function renderInputs(clearValues) {
+    const spec = activeTarget();
+    inputs.innerHTML = "";
+    spec.variables.forEach(function (id) {
+      const info = variableInfo[id];
+      const wrapper = document.createElement("div");
+      wrapper.className = "field";
+      const label = document.createElement("label");
+      label.setAttribute("for", "input-" + id);
+      label.textContent = info.label + (info.unit ? " (" + info.unit + ")" : "");
+      const input = document.createElement("input");
+      input.id = "input-" + id;
+      input.dataset.variable = id;
+      input.type = "number";
+      input.step = "any";
+      input.inputMode = "decimal";
+      input.placeholder = info.placeholder;
+      if (!clearValues) {
+        const previous = document.getElementById("input-" + id);
+        if (previous) input.value = previous.value;
+      }
+      wrapper.appendChild(label);
+      wrapper.appendChild(input);
+      inputs.appendChild(wrapper);
+    });
+    equation.textContent = spec.equation;
+    resultValue.textContent = "—";
+    resultUnit.textContent = "กรอกข้อมูลแล้วกด “คำนวณ”";
+    message.textContent = "";
+    message.className = "message";
+  }
+
+  function updateMonthVisibility() {
+    monthField.classList.toggle("hidden", modelType.value === "combined");
+    renderInputs(true);
+  }
+
+  function calculateResult() {
+    const spec = activeTarget();
+    const values = {};
+    const missing = [];
+    spec.variables.forEach(function (id) {
+      const input = document.getElementById("input-" + id);
+      const value = Number(input.value);
+      if (input.value.trim() === "" || !Number.isFinite(value)) {
+        missing.push(variableInfo[id].label);
+      } else {
+        values[id] = value;
+      }
+    });
+    if (missing.length) {
+      message.className = "message error";
+      message.textContent = "กรุณากรอกข้อมูลให้ครบ: " + missing.join(", ");
+      resultValue.textContent = "—";
+      resultUnit.textContent = "ยังไม่สามารถคำนวณได้";
+      return;
+    }
+    const result = spec.calc(values);
+    if (!Number.isFinite(result)) {
+      message.className = "message error";
+      message.textContent = "ไม่สามารถคำนวณผลลัพธ์จากค่าที่กรอกได้ กรุณาตรวจสอบข้อมูล";
+      resultValue.textContent = "—";
+      resultUnit.textContent = "";
+      return;
+    }
+    message.className = "message success";
+    message.textContent = "คำนวณสำเร็จ — " + activeModel().label;
+    resultValue.textContent = result.toLocaleString("th-TH", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    resultUnit.textContent = spec.unit;
+  }
+
+  function resetAll() {
+    Array.from(inputs.querySelectorAll("input")).forEach(function (input) { input.value = ""; });
+    message.textContent = "";
+    message.className = "message";
+    resultValue.textContent = "—";
+    resultUnit.textContent = "กรอกข้อมูลแล้วกด “คำนวณ”";
+  }
+
+  modelType.addEventListener("change", updateMonthVisibility);
+  month.addEventListener("change", function () { renderInputs(true); });
+  target.addEventListener("change", function () { renderInputs(true); });
+  calculate.addEventListener("click", calculateResult);
+  reset.addEventListener("click", resetAll);
+
+  updateMonthVisibility();
+})();
+</script>
+</body>
+</html>
