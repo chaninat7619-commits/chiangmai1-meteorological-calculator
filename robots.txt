@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://chaninat7619-commits.github.io/chiangmai1-meteorological-calculator/sitemap.xml
